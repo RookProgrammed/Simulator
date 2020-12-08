@@ -8,6 +8,8 @@
 #define __PIPE_H__
 
 #include <cstdint>
+//2 level branch header
+#include "dynamic_branch_predictor.h"
 
 #include "abstract_branch_predictor.h"
 #include "abstract_memory.h"
@@ -69,9 +71,14 @@ typedef struct Pipe_Op {
 
 	//shows if the operation is ready for the next stage of pipeline
 	bool readyForNextStage;
+
+	//Added code, branch prediction start
+	uint32_t pred_dest;
+	bool pred_taken;
+	//Added code end
 } Pipe_Op;
 
-/* The pipe state represents the current state of the pipeline. It holds a
+/* The pipe state represents the current state of the pipeline. It holds br_a
  * pointer to the op that is currently at the input of each stage. As stages
  * execute, they remove the op from their input (set the pointer to NULL) and
  * place an op at their output. If the pointer that represents a stage's output
