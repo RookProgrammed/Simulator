@@ -1,0 +1,5 @@
+i 8 0xff00
+i 9 0x00ff
+i 11 0xff00
+run 20
+q
