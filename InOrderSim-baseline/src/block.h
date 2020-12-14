@@ -48,7 +48,7 @@ public:
 
 	// Added
 	void setTag(uint32_t addr, uint64_t numSets) {
-		tag = addr / numSets;
+		tag = (addr / blkSize) / numSets;
 	}
 
 	void clear(uint32_t blk_tag) {

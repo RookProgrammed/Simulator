@@ -11,9 +11,9 @@
 #include "cache.h"
 
 Cache::Cache(uint32_t size, uint32_t associativity, uint32_t blkSize,
-		enum ReplacementPolicy replType, uint32_t delay):
+		enum ReplacementPolicy replType, uint32_t delay, bool is_bottom):
 		AbstractMemory(delay, 100),cSize(size),
-		associativity(associativity), blkSize(blkSize) {
+		associativity(associativity), blkSize(blkSize), is_bottom(is_bottom) {
 
 	numSets = cSize / (blkSize * associativity);
 	blocks = new Block**[numSets];
@@ -77,15 +77,24 @@ int Cache::getWay(uint32_t addr) {
 
 /*You should complete this function*/
 bool Cache::sendReq(Packet * pkt){
+	packet_size = pkt->size;
 	DPRINTF(DEBUG_CACHE,
 			"request for cache for pkt : addr = %x, type = %d\n",
 			pkt->addr, pkt->type);
 
-	// Implement TRACE?
-
-	if (reqQueue.size() < reqQueueCapacity) {
+	if ((reqQueue.size() < reqQueueCapacity) && !stall) {
 		// Miss or hit, add time for checking this cache
 		pkt->ready_time += accessDelay;
+
+		if (pkt->isWrite && is_bottom) {
+			stall = 1;
+			if (is_bottom) {
+				AbstractMemory* next_cache = (AbstractMemory*) next;
+				AbstractMemory* main_mem = (AbstractMemory*) next_cache->next;
+				stall += accessDelay + 2 * ((AbstractMemory*) next)->accessDelay
+					+ main_mem->accessDelay; 
+			}
+		}
 
 		reqQueue.push(pkt);
 
@@ -111,17 +120,17 @@ bool Cache::sendReq(Packet * pkt){
 
 /*You should complete this function*/
 void Cache::recvResp(Packet* readRespPkt){
-
 	DPRINTF(DEBUG_CACHE,
 			"Cache received a response for pkt : addr = %x, type = %d\n",
 			readRespPkt->addr, readRespPkt->type);
-
-	//prev->recvResp(readRespPkt);
-	
 	// Act on this packet based on its type
 	switch (readRespPkt->type) {
 		case PacketTypeStore:
-			prev->recvResp(readRespPkt);
+			if (!is_bottom) {
+				prev2->recvResp(readRespPkt);
+			} else {
+				prev->recvResp(readRespPkt);
+			}
 			break;
 		case PacketTypeFetch:
 		case PacketTypeLoad:
@@ -141,14 +150,38 @@ void Cache::recvResp(Packet* readRespPkt){
 }
 
 /*You should complete this function*/
-void Cache::Tick(){
+void Cache::Tick() {
 	while (!reqQueue.empty()) {
 		// check if any packet is ready to be serviced
 		if (reqQueue.front()->ready_time <= currCycle) {
 			Packet *pkt = reqQueue.front();
+			int setNo = (numSets - 1) & (pkt->addr / blkSize);
+			int way = getWay(pkt->addr);
 			// Nested if structure tests READ/WRITE, then REQUEST/RESPONSE
 			if (pkt->isWrite) {
+				Block *b = blocks[setNo][way];
+				if (way < 0 || !b->getValid()) {
+					// Return if we already handled for write-allocate
+					if (stall == 2) {
+						reqQueue.pop();
+						reqQueue.push(pkt);
+						return;
+					}
+					// Handle in accordance with write-allocate requirements
+					Packet *wa_pkt = new Packet(true, false, PacketTypeLoad,
+								(uint32_t) (pkt-> addr - (pkt->addr % blkSize)), (uint32_t) blkSize,
+								new uint8_t[blkSize], (uint32_t) currCycle);
+					wa_pkt->send_to_pipe = false;
+					if (next->sendReq(wa_pkt)) {
+						stall = 2;
+						return;
+					} else {
+						delete wa_pkt;
+						return;
+					}
+				}
 				if (pkt->isReq) {
+					stall = 0;
 					if (next->sendReq(pkt)) {
 						reqQueue.pop();
 					} else {
@@ -165,11 +198,9 @@ void Cache::Tick(){
 					return;
 				}
 			} else {
-				int setNo = (numSets - 1) & (pkt->addr / blkSize);
-				int way = getWay(pkt->addr);
 				if (pkt->isReq) {
 					if (way < 0) {
-						// If we miss, check in the next lower level
+						// If we miss, stall and check in the next lower level
 						if (next->sendReq(pkt)) {
 							reqQueue.pop();
 							return;
@@ -184,20 +215,38 @@ void Cache::Tick(){
 							*(pkt->data + i) = *(b->getData() + word_index + i);
 						}
 						pkt->isReq = false;
-						prev->recvResp(pkt);
+						if ((pkt->type == PacketTypeLoad) && !is_bottom)
+							prev2->recvResp(pkt);
+						else prev->recvResp(pkt);
 					}
 				} else {
 					Block *b = replPolicy->getVictim(pkt->addr, true);
 					// NOTE: THIS SPOT IS USEFUL FOR VICTIM BLOCK HANDLING
 					// If receiving a response to a read miss, we
 					// must place this data into this cache
-					int word_index = pkt->addr % blkSize;
-					for (uint32_t i = 0; i < pkt->size; i++) {
-						*(b->getData() + word_index + i) = *(pkt->data + i);
+					for (uint32_t i = 0; i < blkSize; i++) {
+						*(b->getData() + i) = *(pkt->data + i);
 					}
 					b->setTag(pkt->addr, numSets);
-					prev->recvResp(pkt);
-				}
+					b->setValid(true);
+					if (is_bottom && pkt->send_to_pipe) {
+						delete pkt->data;
+						pkt->data = new uint8_t[pkt->size];
+						int word_index = pkt->addr % blkSize;
+						for (uint32_t i = 0; i < pkt->size; i++) {
+							*(pkt->data + i) = *(b->getData() + word_index + i);
+						}
+						if ((pkt->type == PacketTypeLoad) && !is_bottom)
+							prev2->recvResp(pkt);
+						else prev->recvResp(pkt);
+					} else { 
+						if (!is_bottom) {
+							if (pkt->type == PacketTypeLoad)
+								prev2->recvResp(pkt);
+							else prev->recvResp(pkt);
+						}
+					}
+				}		
 			}
 			reqQueue.pop();
 		} else {
