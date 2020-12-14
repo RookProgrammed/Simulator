@@ -58,6 +58,7 @@ PipeState::~PipeState() {
 	delete BP;
 }
 
+
 void PipeState::pipeCycle() {
 	if (DEBUG_PIPE) {
 		printf("\n\n----\nCycle : %lu\nPIPELINE:\n", currCycle);
@@ -263,9 +264,17 @@ void PipeState::pipeStageExecute() {
 		if (op->reg_src1 == 0)
 			op->reg_src1_value = 0;
 		else if (mem_op && mem_op->reg_dst == op->reg_src1) {
-			stall = 1;
+			//stall = 1; 
+			// forwarding src1
+			op->reg_src1_value = REGS[op->reg_src1];
+			mem_op->reg_dst_value = op->reg_src1_value;
+			mem_op->reg_dst_value_ready = 1;
 		} else if (wb_op && wb_op->reg_dst == op->reg_src1) {
-			stall = 1;
+			//stall = 1; 
+			// forwarding src1
+			op->reg_src1_value = REGS[op->reg_src1];
+			wb_op->reg_dst_value = op->reg_src1_value;
+			wb_op->reg_dst_value_ready = 1;
 		} else
 			op->reg_src1_value = REGS[op->reg_src1];
 	}
@@ -273,9 +282,17 @@ void PipeState::pipeStageExecute() {
 		if (op->reg_src2 == 0)
 			op->reg_src2_value = 0;
 		else if (mem_op && mem_op->reg_dst == op->reg_src2) {
-			stall = 1;
+			//stall = 1; 
+			// forwarding src2
+			op->reg_src2_value = REGS[op->reg_src2];
+			mem_op->reg_dst_value = op->reg_src2_value;
+			mem_op->reg_dst_value_ready = 1;
 		} else if (wb_op && wb_op->reg_dst == op->reg_src2) {
-			stall = 1;
+			//stall = 1; 
+			// forwarding src2
+			op->reg_src2_value = REGS[op->reg_src2];
+			wb_op->reg_dst_value = op->reg_src2_value;
+			wb_op->reg_dst_value_ready = 1;
 		} else
 			op->reg_src2_value = REGS[op->reg_src2];
 	}
