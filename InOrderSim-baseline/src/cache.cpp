@@ -241,16 +241,30 @@ void Cache::Tick() {
 						// If we hit, respond with the information
 						Block *b = blocks[setNo][way];
 						int word_index = pkt->addr % blkSize;
-						// copy block data into packet
-						for (uint32_t i = 0; i < pkt->size; i++) {
-							*(pkt->data + i) = *(b->getData() + word_index + i);
+						if (is_bottom) {
+							// copy block data into packet
+							for (uint32_t i = 0; i < pkt->size; i++) {
+								*(pkt->data + i) = *(b->getData() + word_index + i);
+							}
+							// Signal it is now a response packet
+							pkt->isReq = false;
+							// send to proper location
+							if ((pkt->type == PacketTypeLoad) && !is_bottom)
+								prev2->recvResp(pkt);
+							else prev->recvResp(pkt);
+						} else {
+							delete pkt->data;
+							pkt->data = new uint8_t[blkSize];
+							for (uint32_t i = 0; i < blkSize; i++) {
+								*(pkt->data + i) = *(b->getData() + i);
+							}
+							pkt->isReq = false;
+							if ((pkt->type == PacketTypeLoad)) {
+								prev2->recvResp(pkt);
+							} else {
+								prev->recvResp(pkt);
+							}
 						}
-						// Signal it is now a response packet
-						pkt->isReq = false;
-						// send to proper location
-						if ((pkt->type == PacketTypeLoad) && !is_bottom)
-							prev2->recvResp(pkt);
-						else prev->recvResp(pkt);
 					}
 				} else {
 					// Now handling a response to a read miss, and write-allocate responses
