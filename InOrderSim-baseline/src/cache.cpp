@@ -179,12 +179,17 @@ void Cache::Tick() {
 			int way = getWay(pkt->addr);
 			// Nested if structure tests READ/WRITE, then REQUEST/RESPONSE
 			if (pkt->isWrite) {
-				Block *b = blocks[setNo][way];
+				Block *b;
+				if (way >= 0) {
+					b = blocks[setNo][way];
+				}
 				if (way < 0 || !b->getValid()) {
 					// Return if we already handled for write-allocate
 					// This forces a stall loop until the cache block for writing is filled with valid data
 					// The push and pop allow the memory response to be handled
 					// This action is for WRITE ALLOCATE
+					// stall = 2 means the cache is waiting on the cache block to be filled before writing data
+					// for write allocate action
 					if (stall == 2) {
 						reqQueue.pop();
 						reqQueue.push(pkt);
