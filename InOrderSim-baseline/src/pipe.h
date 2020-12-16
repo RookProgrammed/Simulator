@@ -8,9 +8,6 @@
 #define __PIPE_H__
 
 #include <cstdint>
-//2 level branch header
-#include "dynamic_branch_predictor.h"
-
 #include "abstract_branch_predictor.h"
 #include "abstract_memory.h"
 #include "base_object.h"
