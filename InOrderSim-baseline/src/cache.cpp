@@ -219,9 +219,6 @@ void Cache::Tick() {
 					} else {
 						return;
 					}
-					// Select our way for writing based on replacement policy
-					Block *b = replPolicy->getVictim(pkt->addr, true);
-					// NOTE: THIS SPOT IS USEFUL FOR VICTIM BLOCK HANDLING !!!!!!! Come here for victim blocks
 					int word_index = pkt->addr % blkSize;
 					// Replace the block data with packet data
 					for (uint32_t i = 0; i < pkt->size; i++) {
