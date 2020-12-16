@@ -74,6 +74,19 @@ int Cache::getWay(uint32_t addr) {
 	return -1;
 }
 
+// Invalidates a cache block given its address
+void Cache::invalidate(uint32_t addr) {
+	uint32_t _addr = addr / blkSize;
+	uint32_t setIndex = (numSets - 1) & _addr;
+	uint32_t addrTag = _addr / numSets;
+	for (int i = 0; i < (int) associativity; i++) {
+		if (blocks[setIndex][i]->getTag() == addrTag) {
+			blocks[setIndex][i]->setValid(false);
+		}
+	}
+	return;
+}
+
 
 /*You should complete this function*/
 bool Cache::sendReq(Packet * pkt){
@@ -271,6 +284,16 @@ void Cache::Tick() {
 				} else {
 					// Now handling a response to a read miss, and write-allocate responses
 					Block *b = replPolicy->getVictim(pkt->addr, true);
+					// Maintain inclusivity by invalidating L1 versions of the evicted block
+					if (!is_bottom) {
+						if (pkt->type == PacketTypeLoad) {
+							// Invalidate L1I block for load
+							((Cache*) prev)->invalidate(b->getTag());
+						} else {
+							// Invalidate L1D block for fetch
+							((Cache*) prev2)->invalidate(b->getTag());
+						}
+					}						
 					// NOTE: THIS SPOT IS USEFUL FOR VICTIM BLOCK HANDLING
 					// If receiving a response to a read miss, we
 					// must place this data into this cache
@@ -292,7 +315,9 @@ void Cache::Tick() {
 							prev2->recvResp(pkt);
 						else prev->recvResp(pkt);
 					} else { 
+						// L2 Cache
 						if (!is_bottom) {
+							// Handle appropriately, if I cache or D cache as recipient
 							if (pkt->type == PacketTypeLoad)
 								prev2->recvResp(pkt);
 							else prev->recvResp(pkt);
