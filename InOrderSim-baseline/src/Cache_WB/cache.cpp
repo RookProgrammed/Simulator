@@ -9,6 +9,7 @@
 #include "repl_policy.h"
 #include "next_line_prefetcher.h"
 #include "cache.h"
+#include "base_memory.h"
 
 Cache::Cache(uint32_t size, uint32_t associativity, uint32_t blkSize,
 		enum ReplacementPolicy replType, uint32_t delay, bool is_L1):
@@ -322,12 +323,24 @@ void Cache::Tick(){
 	return;
 }
 
+
 /*You should complete this function*/
 void Cache::dumpRead(uint32_t addr, uint32_t size, uint8_t* data){
 	int setNo = (numSets - 1) & (addr / blkSize);
 	int word_index = addr % blkSize;
-	Block *b = blocks[setNo][getWay(addr)];
-	for (uint32_t i = 0; i < size; i++) {
-		*(data + i) = *(b->getData() + word_index + i);
+	int way = getWay(addr);
+	if (way == -1){
+		if (is_L1){
+			((Cache *)next)-> dumpRead(addr, size, data);
+		}
+		else{
+			((BaseMemory *)next)->dumpRead(addr, size, data);
+		}
+	}
+	else {
+		Block *b = blocks[setNo][way];
+		for (uint32_t i = 0; i < size; i++) {
+			*(data + i) = *(b->getData() + word_index + i);
+	    }
 	}
 }
