@@ -121,7 +121,7 @@ void Cache::recvResp(Packet* readRespPkt){
 		//make sure that the victim cache is not valide in L1
 		int L1D_way = (prev==nullptr)? -1:((Cache *)prev)->getWay(victim_addr);
 		int L1I_way = (prev2==nullptr)?-1:((Cache *)prev2)->getWay(victim_addr);
-		int upper_Index = (readRespPkt->addr / blkSize) & (((Cache *)prev)->numSets -1);
+		int upper_Index1 = (readRespPkt->addr / blkSize) & (((Cache *)prev)->numSets -1);
 		if (L1D_way >= 0){
 			//this means there is a corresponding cache in the L1D
 			Block * upper_block = ((Cache *)prev)->blocks[upper_Index][L1D_way];
@@ -142,9 +142,10 @@ void Cache::recvResp(Packet* readRespPkt){
 				};
 			}
 		}
+		int upper_Index2 = (readRespPkt->addr / blkSize) & (((Cache *)prev2)->numSets -1);
 		if (L1I_way >=0){
 			//no write for the instruction cache known, unless some strage behavior
-			((Cache *)prev2)->blocks[upper_Index][L1I_way]->setValid(false);
+			((Cache *)prev2)->blocks[upper_Index2][L1I_way]->setValid(false);
 		}
 	}
 	if (victim_block->getDirty() && !L1D_newer){
