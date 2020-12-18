@@ -6,7 +6,7 @@
 #include <math.h>
 #include <cstdio>
 
----check
+//---check
 BranchPredict_NT::BranchPredict_NT(uint32_t histTab_BTBSize, int Width_bht, int Width_pht, int rasSize) { // Not sure about this as both might have same sizes
     
     notTake_Character = 0;take_Character = 1;
