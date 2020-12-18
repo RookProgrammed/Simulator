@@ -114,8 +114,6 @@ void Cache::recvResp(Packet* readRespPkt){
 	
 	/************this is used for inclusive cache*************/
 	bool L1D_newer = false;
-	/************this is used for inclusive cache*************/
-	bool L1D_newer = false;
 	if (!is_L1){
 		//currently, we are changing L2
 		//make sure that the victim cache is not valide in L1
