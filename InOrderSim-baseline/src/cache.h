@@ -13,6 +13,7 @@
 #include "repl_policy.h"
 #include <cstdint>
 
+
 /*
  * You should implement MSHR
  */
@@ -31,12 +32,15 @@ private:
 	AbstractPrefetcher* prefetcher;
 	MSHR* mshr;
 	uint64_t cSize, associativity, blkSize, numSets;
+	bool is_L1;
+	
 
 public:
-	//Pointer to an array of block pointers
+	//Pointer to an array of pointers
 	Block ***blocks;
+	std::queue<Block*> write_back_buffer;
 	Cache(uint32_t _Size, uint32_t _associativity, uint32_t _blkSize,
-			enum ReplacementPolicy _replPolicy, uint32_t _delay);
+			enum ReplacementPolicy _replPolicy, uint32_t _delay, bool is_L1);
 	virtual ~Cache();
 	virtual bool sendReq(Packet * pkt) override;
 	virtual void recvResp(Packet* readRespPkt) override;

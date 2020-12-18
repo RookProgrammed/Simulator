@@ -8,12 +8,14 @@
 #include "mips.h"
 #include "abstract_memory.h"
 #include "static_nt_branch_predictor.h"
+#include "dynamic_branch_predictor.h"
 #include <cstdio>
 #include <iostream>
 #include <cstring>
 #include <cstdlib>
 #include <cassert>
 #include "util.h"
+
 
 /* debug */
 void printOp(Pipe_Op *op) {
@@ -40,8 +42,8 @@ PipeState::PipeState() :
 	}
 	//initialize PC
 	PC = 0x00400000;
-	//initialize the branch predictor
-	BP = new StaticNTBranchPredictor();
+	//initialize the branch predictor, changed to DBP
+	BP = new BranchPredict_NT(1024, 8, 2, 16);
 }
 
 PipeState::~PipeState() {
@@ -545,65 +547,53 @@ void PipeState::pipeStageExecute() {
 	//update the branch predictor metadata
 
 	//Added code, branch prediction start
-	btb_return btb_result;
-	b_recov recov_info;
-	uint_32 bht_index;
-	bool btb_mismatch;
-
 	if (op->is_branch == 1)
 	{
-		btb_result = btb_pred(op->pc);
-		recov_info.pc = op->pc;
-		if (op->branch_cond == 1) //condition branch
+		BP->update(op->pc, op->branch_taken, op->branch_dest, op->opcode, op->subop); //update
+		if(fetch_op != NULL)//flush fetch
 		{
-			bht_index = get_bht_index(op->pc);
-			recov_info.b_type = cond;
-			recov_info.bht_s = BHT[bht_index];
-			if (op->pred_taken != op->branch_taken) //condition prediction wrong
+			if(op->branch_taken)
 			{
-				recov_info.mispred = true;
-				if (op->branch_taken == 1)
+				if(fetch_op->pc != op->branch_dest) //branch destination mismatch
 				{
-					recov_info.taken = true;
+					//switch to dest
 					pipeRecover(3, op->branch_dest);
 				}
-				else
+			}
+			else if(fetch_op->pc != op->pc+4)
+			{
+				//fetch next inst
+				pipeRecover(3, op->pc+4);
+			}
+		}
+		else if(decode_op != NULL)//flush decode
+		{
+			if(op->branch_taken)
+			{
+				if(decode_op->pc != op->branch_dest) //branch destination mismatch
 				{
-					recov_info.taken = false
-					pipeRecover(3, op->pc + 4);
+					//switch to dest
+					pipeRecover(3, op->branch_dest);
 				}
 			}
-			update_BHR(recov_info.taken);
-			update_BHT(bht_index, recov_info.bht_s, recov_info.taken)
+			else if(decode_op->pc != op->pc+4)
+			{
+				//fetch next inst
+				pipeRecover(3, op->pc+4);
+			}
 		}
-		else  //direct branch
-		{
-			if (op->opcode == OP_JAL)
-				recov_info.b_type = jal;
-			else if (op->opcode == SUBOP_JALR)
-				recov_info.b_type = jalr;
-			else if(op->opcode == SUBOP_JR)
-				recov_info.b_type = jr;
-			else if (op->opcode == OP_J)
-				recov_info.b_type = j;
-		}
-		if ((op->branch_dest != op->pred_dest) && (btb_result.hit))
-		{
-			btb_mismatch = true;
-		}
-		update_btb(op->pc, op->branch_dest, recov_info.b_type, btb_result.hit, btb_mismatch)
-		//ras??
-
+		else //no need to recover
+        	{
+            		if (op->branch_taken)
+            		{	
+                		PC = op->branch_dest;
+            		}
+            		else
+                		PC = op->pc + 4;
+        		}
 	}
 
-	if(op->is_branch)
-
 	//Added code end
-
-	//BP->update(op->pc, op->branch_taken, op->branch_dest);
-	//handle branch recoveries at this point
-	//if (op->branch_taken)
-		//pipeRecover(3, op->branch_dest);
 
 	//remove from upstream stage and place in downstream stage
 	execute_op = NULL;
@@ -762,6 +752,29 @@ void PipeState::pipeStageFetch() {
 			return;
 		else {
 			decode_op = fetch_op;
+			//Added branch prediction
+			uint32_t opcode = (fetch_op->instruction >> 26) & 0x3F;
+            		uint32_t rt = (fetch_op->instruction >> 16) & 0x1F;
+            		uint32_t func = fetch_op->instruction & 0x3F;
+            		uint32_t subop;
+            		if(opcode == OP_SPECIAL)
+            		{
+            			subop = func;
+            		}
+            		else if(opcode == OP_BRSPEC)
+            		{
+            			subop = rt;
+            		}
+            		uint32_t dest_pred = BP->getTarget(PC, opcode, subop);
+            		if(dest_pred == -1)
+            		{
+            			PC = PC+4;
+            		}
+            		else
+            		{
+            			PC = dest_pred;
+            		}
+			//Added code end
 			fetch_op = nullptr;
 			stat_inst_fetch++;
 		}
@@ -781,34 +794,6 @@ void PipeState::pipeStageFetch() {
 	//try to send the memory request
 	fetch_op->isFetchIssued = inst_mem->sendReq(fetch_op->instFetchPkt);
 	//get the next instruction to fetch from branch predictor
-	
-	//Added code, branch prediction start
-	uint_32 opcode;
-	bool branch;
-	b_pred_return pred_result;
-	opcode = (fetch_op->instruction >> 26) & 0x3F;
-	branch = (opcode == OP_BRSPEC || opcode == OP_JAL || opcode == OP_J ||
-		opcode == OP_BEQ || opcode == OP_BNE || opcode == OP_BLEZ ||
-		opcode == OP_BGTZ);
-	if (branch)
-	{
-		pred_result = b_pred(PC);
-		fetch_op->pred_dest = pred_result.dest;
-		fetch_op->br_taken = pred_result.taken;
-		if (pred_result.taken)//taken
-		{
-			PC = pred_result.dest;
-			return;
-		}
-		else//not
-			PC = PC + 4;
-	}
-	else
-	{
-		PC = PC + 4;
-	}
-	//Added code end
-
 	//uint32_t target = BP->getTarget(PC);
 	//if (target == -1) {
 		//PC = PC + 4;

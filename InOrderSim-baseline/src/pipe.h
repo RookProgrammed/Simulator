@@ -8,8 +8,6 @@
 #define __PIPE_H__
 
 #include <cstdint>
-//2 level branch header
-#include "dynamic_branch_predictor.h"
 
 #include "abstract_branch_predictor.h"
 #include "abstract_memory.h"
@@ -73,8 +71,8 @@ typedef struct Pipe_Op {
 	bool readyForNextStage;
 
 	//Added code, branch prediction start
-	uint32_t pred_dest;
-	bool pred_taken;
+	uint32_t dest_pred;
+	bool taken_pred;
 	//Added code end
 } Pipe_Op;
 
