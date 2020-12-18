@@ -43,7 +43,7 @@ PipeState::PipeState() :
 	//initialize PC
 	PC = 0x00400000;
 	//initialize the branch predictor, changed to DBP
-	BP = new DynamicNTBranchPredictor(1024, 8, 2, 16);
+	BP = new BranchPredict_NT(1024, 8, 2, 16);
 }
 
 PipeState::~PipeState() {
@@ -765,14 +765,14 @@ void PipeState::pipeStageFetch() {
             		{
             			subop = rt;
             		}
-            		uint32_t pred_dest = BP->getTarget(PC, opcode, subop);
-            		if(pred_dest == -1)
+            		uint32_t dest_pred = BP->getTarget(PC, opcode, subop);
+            		if(dest_pred == -1)
             		{
             			PC = PC+4;
             		}
             		else
             		{
-            			PC = pred_dest;
+            			PC = dest_pred;
             		}
 			//Added code end
 			fetch_op = nullptr;
