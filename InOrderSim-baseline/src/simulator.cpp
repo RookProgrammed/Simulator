@@ -21,15 +21,28 @@ Simulator::Simulator(MemHrchyInfo* info) {
 	 * initializing memory hierarchy
 	 *  you should update this for adding the caches
 	 */
+	L1I_cache = new Cache(info->cache_size_l1, info->cache_assoc_l1, info->cache_blk_size, (ReplacementPolicy) info->repl_policy_l1i, info->access_delay_l1, true);
+	L1D_cache = new Cache(info->cache_size_l1, info->cache_assoc_l1, info->cache_blk_size, (ReplacementPolicy) info->repl_policy_l1d, info->access_delay_l1, true);
+	L2_cache = new Cache(info->cache_size_l2, info->cache_assoc_l2, info->cache_blk_size, (ReplacementPolicy) info->repl_policy_l2, info->access_delay_l2, false);
+
 	main_memory = new BaseMemory(info->memDelay);
 	main_memory->next = nullptr;
 
 	//set the responder for memory operations
-	main_memory->prev = pipe;
+	L1I_cache->next = L2_cache;
+	L1I_cache->prev = pipe;
+	L1D_cache->next = L2_cache;
+	L1D_cache->prev = pipe;
+	L2_cache->prev = L1I_cache;
+	L2_cache->prev2 = L1D_cache;
+	L2_cache->next = main_memory;
+	main_memory->prev = L2_cache;
 
 	//set the first memory in the memory-hierarchy
-	pipe->data_mem = main_memory;
-	pipe->inst_mem = main_memory;
+	//pipe->data_mem = main_memory;
+	//pipe->inst_mem = main_memory;
+	pipe->data_mem = L1D_cache;
+	pipe->inst_mem = L1I_cache;
 }
 
 
@@ -37,6 +50,10 @@ Simulator::Simulator(MemHrchyInfo* info) {
 void Simulator::cycle() {
 	//check if memory needs to respond to any packet in this cycle
 	main_memory->Tick();
+	//check if cache needs to respond to any packet in this cycle
+	L2_cache->Tick();
+	L1I_cache->Tick();
+	L1D_cache->Tick();
 	//progress of the pipeline in this clock
 	pipe->pipeCycle();
 	pipe->stat_cycles++;
@@ -117,5 +134,6 @@ void Simulator::memDump(int start, int stop) {
 
 Simulator::~Simulator() {
 	delete main_memory;
+	delete L2_cache;
 	delete pipe;
 }

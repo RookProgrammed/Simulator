@@ -15,8 +15,8 @@ class StaticNTBranchPredictor: public AbstractBranchPredictor {
 public:
 	StaticNTBranchPredictor();
 	virtual ~StaticNTBranchPredictor();
-	virtual uint32_t getTarget(uint32_t PC) override;
-	virtual void update(uint32_t PC, bool taken, uint32_t target) override;
+	virtual uint32_t getTarget(uint32_t PC, int op_Code, int subop_Code) override;
+	virtual void update(uint32_t PC, bool take, uint32_t target, int op_Code, int subop_Code) override;
 };
 
 #endif /* SRC_STATIC_NT_BRANCH_PREDICTOR_H_ */

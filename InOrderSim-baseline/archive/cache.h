@@ -33,7 +33,8 @@ private:
 	MSHR* mshr;
 	uint64_t cSize, associativity, blkSize, numSets;
 	bool is_L1;
-	
+	uint32_t packet_size = 0, stall = 0;	
+
 
 public:
 	//Pointer to an array of pointers
@@ -45,7 +46,9 @@ public:
 	virtual bool sendReq(Packet * pkt) override;
 	virtual void recvResp(Packet* readRespPkt) override;
 	virtual void Tick() override;
+	int getSetNo(uint32_t addr);
 	int getWay(uint32_t addr);
+	void invalidate(uint32_t addr);
 	virtual uint32_t getAssociativity();
 	virtual uint32_t getNumSets();
 	virtual uint32_t getBlockSize();

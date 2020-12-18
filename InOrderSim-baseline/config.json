@@ -24,10 +24,10 @@
 	"access_delay_l1": 1,
 	"access_delay_l2": 10,
 	"memDelay": 40,
-	"writeBack": false,
-	"debugMemory": false,
+	"writeBack": true,
+	"debugMemory": true,
 	"debugPipe": false,
-	"debugCache": false,
+	"debugCache": true,
 	"debugPrefetch": false,
 	"debugAll": false,
 	"traceMemory": false

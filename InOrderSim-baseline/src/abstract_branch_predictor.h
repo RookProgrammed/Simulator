@@ -21,12 +21,12 @@ public:
 	 * or jump, returns the predicted target. O.w. should
 	 * return -1 as it is predicted no branch
 	 */
-	virtual uint32_t getTarget(uint32_t PC) = 0;
+	virtual uint32_t getTarget(uint32_t PC, int op_Code, int subop_Code) = 0;
 	/*
 	 * It is called after each branch is resolved to update
 	 * the branch predictor metadata
 	 */
-	virtual void update(uint32_t PC, bool taken, uint32_t target) = 0;
+	virtual void update(uint32_t PC, bool take, uint32_t target, int op_Code, int subop_Code) = 0;
 };
 
 #endif

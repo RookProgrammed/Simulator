@@ -1,61 +1,64 @@
-#include <bitset>
+/*
+ * Computer Architecture CSE530
+ * MIPS pipeline cycle-accurate simulator
+ * PSU
+ */
+
 #include "mips.h"
-#include <iterator>
-#include <list>
-#include <algorithm>
+#include "abstract_branch_predictor.h"
 #include <map>
 #include <string>
 #include <vector>
-#include "abstract_branch_predictor.h"
-
-
-
-/* branch Preditor */
-struct BranchHistory 
-{
-    std::vector<int> branchPatternHist;
-    uint32_t Addres_Target;
+#include <iterator>
+#include <algorithm>
+#include <list>
+#include <bitset>
+/*
+ * Dynamic branch predictor
+ */
+struct isBranchAndHistoryRow {
+    std::vector<int> branchPatterHistory;
+    uint32_t targetAddress;
 };
-
-class BranchPredict_NT: public AbstractBranchPredictor 
-{
+class DynamicNTBranchPredictor: public AbstractBranchPredictor {
 public:
-    BranchPredict_NT(uint32_t histTab_BTBSize, int Width_bht, int Width_pht, int rasSize);
-    virtual ~BranchPredict_NT();
-    virtual uint32_t getTarget(uint32_t PC, int op_Code, int subop_Code) override;
-    virtual void update(uint32_t PC, bool take, uint32_t target, int op_Code, int subop_Code) override;
+    DynamicNTBranchPredictor(uint32_t historyTableAndBTBSize, int bhtWidth, int phtWidth, int rasSize);
+    virtual ~DynamicNTBranchPredictor();
+    virtual uint32_t getTarget(uint32_t PC, int opCode, int subopCode) override;
+    virtual void update(uint32_t PC, bool taken, uint32_t target, int opCode, int subopCode) override;
 private:
-    /* Variables*/
-    int Width_BHT;
-    int Width_PHT;
-    int OutcomeCount;
+    //Member Variables
+    int BHTWidth;
+    int PHTWidth;
     int RASSize;
+    int numberOfOutcomes;
+    uint32_t tagMask;
+    std::list <uint32_t> RAS;
+    std::map<uint32_t, isBranchAndHistoryRow> globalHistoryAndBranchTargetTable;
+    std::map<int, bool> outcomeToBool;
+    std::map<std::vector<int>, int> patternHistoryTable; // More access to the predictor than search. So a map not a vector used.
+    std::vector<char>  lookup_table;
+    uint32_t mostRecentlyUsedAddrTag;
+    int takenCharacter;
+    int nottakenCharacter;
     
-    uint32_t MaskTag;
-    std::list <uint32_t> RAS; 
-    std::map<uint32_t, BranchHistory> globalHist_BranchTargetTab;
-    std::map<int, bool> outcome_Bool;
-	/* predictor over search hence we utilise map over vector*/
-    std::map<std::vector<int>, int> patternHist_Tab; 
-    std::vector<char>  lookupTab;
-    uint32_t AddrTag_mostRecent;
-    int take_Character;
-    int notTake_Character;
-    
-    /* Functions*/
-    uint32_t TagToRemove_getAddr();
+    // Member Functions
     uint32_t getTag(uint32_t PC);
-    void initial_PHT(int num_PHTEntries, std::vector<int> pattern, int pos);
-    bool JumpInstrunction_check(int op_Code);
-    std::vector<int> PatternHistory_fetch(uint32_t addrTag);
-    int Branch_Outcome(std::vector<int> patternHistory);
-    bool PCcheckInBTB_GHT(uint32_t addrTag);
-    bool PCcheck_NotBranch(int op_Code, int subop_Code);
-    uint32_t PredictCheck_GetTarget(uint32_t addrTag);
-    bool InstructReturn_check(int op_Code, int subop_Code);
-    void PHTForMisPrediction_update(int branchOutcome, std::vector<int> patternHistory);
-    void PHTForCorrectPrediction_update(int branchOutcome, std::vector<int> patternHistory);
-    void checkPrediction_Update(int branchOutcome, std::vector<int> patternHistory, bool take);
-    void addMissingPC_GlobalHistBranchTab(uint32_t addrTag, uint32_t target, bool take);
-    void GlobalHistTab_update(uint32_t addrTag, std::vector<int> patternHistory, bool take, uint32_t target);
+    uint32_t getAddrTagToRemove();
+    void initPHT(int numberPHTEntries, std::vector<int> pattern, int pos);
+    bool checkIfInstrunctionIsJump(int opCode);
+    std::vector<int> getPatternHistory(uint32_t addrTag);
+    int getBranchOutcome(std::vector<int> patternHistory);
+    bool doesPCNotExistsInBTB_GHT(uint32_t addrTag);
+    bool checkIfPCNotABranch(int opCode, int subopCode);
+    uint32_t checkPredictorAndGetTarget(uint32_t addrTag);
+    bool checkIfInstructionIsReturn(int opCode, int subopCode);
+    void updatePHTForMisPrediction(int branchOutcome, std::vector<int> patternHistory);
+    void updatePHTForCorrectPrediction(int branchOutcome, std::vector<int> patternHistory);
+    void checkPredictionAndUpdate(int branchOutcome, std::vector<int> patternHistory, bool taken);
+    void addMissingPCInGlobalHistAndBranchTargetTable(uint32_t addrTag, uint32_t target, bool taken);
+    void updateGlobalHistoryTable(uint32_t addrTag, std::vector<int> patternHistory, bool taken, uint32_t target);
+
+
 };
+

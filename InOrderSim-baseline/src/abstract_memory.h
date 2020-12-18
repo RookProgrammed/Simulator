@@ -10,6 +10,7 @@
 #include <queue>
 #include "util.h"
 #include "base_object.h"
+#include "block.h"
 
 
 /*
@@ -51,6 +52,8 @@ public:
 	 */
 	BaseObject* next;
 	BaseObject* prev;
+	
+	BaseObject* prev2;
 
 	/*
 	 * function for reading a portion of memory and used for

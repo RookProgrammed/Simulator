@@ -8,6 +8,7 @@
 #define __PIPE_H__
 
 #include <cstdint>
+
 #include "abstract_branch_predictor.h"
 #include "abstract_memory.h"
 #include "base_object.h"

@@ -75,6 +75,18 @@ int Cache::getWay(uint32_t addr) {
 	return -1;
 }
 
+// Invalidates a cache block given its address
+void Cache::invalidate(uint32_t addr) {
+	uint32_t _addr = addr / blkSize;
+	uint32_t setIndex = (numSets - 1) & _addr;
+	uint32_t addrTag = _addr / numSets;
+	for (int i = 0; i < (int) associativity; i++) {
+		if (blocks[setIndex][i]->getTag() == addrTag) {
+			blocks[setIndex][i]->setValid(false);
+		}
+	}
+	return;
+}
 
 /*You should complete this function*/
 bool Cache::sendReq(Packet * pkt){

@@ -8,12 +8,14 @@
 #include "mips.h"
 #include "abstract_memory.h"
 #include "static_nt_branch_predictor.h"
+#include "dynamic_branch_predictor.h"
 #include <cstdio>
 #include <iostream>
 #include <cstring>
 #include <cstdlib>
 #include <cassert>
 #include "util.h"
+
 
 /* debug */
 void printOp(Pipe_Op *op) {
@@ -40,9 +42,8 @@ PipeState::PipeState() :
 	}
 	//initialize PC
 	PC = 0x00400000;
-	//initialize the branch predictor
-   	BP = new DynamicNTBranchPredictor(info->bht_entries, info->bht_entry_width, info->pht_width, info->ras_size);
-                    //new StaticNTBranchPredictor();
+	//initialize the branch predictor, changed to DBP
+	BP = new DynamicNTBranchPredictor(1024, 8, 2, 16);
 }
 
 PipeState::~PipeState() {
@@ -591,12 +592,8 @@ void PipeState::pipeStageExecute() {
                 		PC = op->pc + 4;
         		}
 	}
-	//Added code end
 
-	//BP->update(op->pc, op->branch_taken, op->branch_dest);
-	//handle branch recoveries at this point
-	//if (op->branch_taken)
-		//pipeRecover(3, op->branch_dest);
+	//Added code end
 
 	//remove from upstream stage and place in downstream stage
 	execute_op = NULL;
@@ -755,7 +752,7 @@ void PipeState::pipeStageFetch() {
 			return;
 		else {
 			decode_op = fetch_op;
-			//added branch prediction
+			//Added branch prediction
 			uint32_t opcode = (fetch_op->instruction >> 26) & 0x3F;
             		uint32_t rt = (fetch_op->instruction >> 16) & 0x1F;
             		uint32_t func = fetch_op->instruction & 0x3F;
@@ -777,7 +774,7 @@ void PipeState::pipeStageFetch() {
             		{
             			PC = pred_dest;
             		}
-			//added code end
+			//Added code end
 			fetch_op = nullptr;
 			stat_inst_fetch++;
 		}
@@ -797,7 +794,6 @@ void PipeState::pipeStageFetch() {
 	//try to send the memory request
 	fetch_op->isFetchIssued = inst_mem->sendReq(fetch_op->instFetchPkt);
 	//get the next instruction to fetch from branch predictor
-
 	//uint32_t target = BP->getTarget(PC);
 	//if (target == -1) {
 		//PC = PC + 4;

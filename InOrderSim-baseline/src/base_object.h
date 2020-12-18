@@ -40,6 +40,7 @@ public:
 	uint8_t* data;
 	//when should this packet be serviced?
 	uint32_t ready_time;
+	bool send_to_pipe = true;
 };
 
 /*

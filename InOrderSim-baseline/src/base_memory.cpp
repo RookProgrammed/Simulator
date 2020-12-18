@@ -10,6 +10,7 @@
 #include <cstring>
 #include "base_memory.h"
 #include "util.h"
+#include "cache.h"
 
 BaseMemory::BaseMemory(uint32_t memDelay) :
 		AbstractMemory(memDelay, 100) {
@@ -94,6 +95,7 @@ BaseMemory::getMemRegion(uint32_t addr, uint32_t size) {
 }
 
 void BaseMemory::Tick() {
+	uint32_t blkSize = ((Cache*) prev)->getBlockSize();
 	while (!reqQueue.empty()) {
 		//check if any packet is ready to be serviced
 		if (reqQueue.front()->ready_time <= currCycle) {
@@ -102,42 +104,68 @@ void BaseMemory::Tick() {
 			DPRINTF(DEBUG_MEMORY,
 					"main memory send respond for pkt: addr = %x, ready_time = %d\n",
 					respPkt->addr, respPkt->ready_time);
-			if (respPkt->isWrite) {
-				mem_region_t* mem_region = getMemRegion(respPkt->addr,
-						respPkt->size);
+			if (!respPkt->isReq){
+				mem_region_t* mem_region = getMemRegion(respPkt->addr, blkSize);
+				Block *wb_block = ((Cache*) prev)->write_back_buffer.front();
+				((Cache*) prev)->write_back_buffer.pop();
 				int index = respPkt->addr - mem_region->start;
-				//perform the write in the memory
 				for (uint32_t i = 0; i < respPkt->size; i++) {
-					mem_region->mem[index + i] = *(respPkt->data + i);
+					mem_region->mem[index + i] = *(wb_block->getData() + i);
 				}
-				//change this pkt to respond pkt
-				respPkt->isReq = false;
-				//the data part is no longer needed
-				delete respPkt->data;
-				respPkt->data = nullptr;
-				/*
-				 * send the respond to the previous base_object which is waiting
-				 * for this respond packet. For now, prev for memory is core but
-				 * you should update the prev since you are adding the caches
-				 */
-				prev->recvResp(respPkt);
-			} else {
-				mem_region_t* mem_region = getMemRegion(respPkt->addr,
-						respPkt->size);
-				int index = respPkt->addr - mem_region->start;
-				//perform the read
-				for (uint32_t i = 0; i < respPkt->size; i++) {
-					*(respPkt->data + i) = mem_region->mem[index + i];
-				}
-				respPkt->isReq = false;
-				/*
-				 * send the respond to the previous base_object which is waiting
-				 * for this respond packet. For now, prev for memory is core but
-				 * you should update the prev since you are adding the caches
-				 */
-				prev->recvResp(respPkt);
 			}
-		} else {
+			else{
+				if (respPkt->isWrite) {
+					printf("Main Memory write\n");
+					mem_region_t* mem_region = getMemRegion(respPkt->addr,
+							respPkt->size);
+					int index = respPkt->addr - mem_region->start;
+					//perform the write in the memory
+					for (uint32_t i = 0; i < respPkt->size; i++) {
+						mem_region->mem[index + i] = *(respPkt->data + i);
+					}
+					//change this pkt to respond pkt
+					respPkt->isReq = false;
+					//the data part is no longer needed
+					uint32_t block_addr = respPkt->addr - (respPkt->addr % blkSize);
+					mem_region_t* mem_block = getMemRegion(block_addr,
+							blkSize);
+					index = block_addr - mem_block->start;
+					//perform the read
+					delete respPkt->data;
+					respPkt->data = new uint8_t[blkSize];
+					for (uint32_t i = 0; i < blkSize; i++) {
+						*(respPkt->data + i) = mem_block->mem[index + i];
+					}
+					/*
+					* send the respond to the previous base_object which is waiting
+					* for this respond packet. For now, prev for memory is core but
+					* you should update the prev since you are adding the caches
+					*/
+					prev->recvResp(respPkt);
+				} 
+				else {
+					printf("handling a read at %ld\n", currCycle);
+					uint32_t block_addr = respPkt->addr - (respPkt->addr % blkSize);
+					mem_region_t* mem_region = getMemRegion(block_addr,
+							blkSize);
+					int index = block_addr - mem_region->start;
+					//perform the read
+					delete respPkt->data;
+					respPkt->data = new uint8_t[blkSize];
+					for (uint32_t i = 0; i < blkSize; i++) {
+						*(respPkt->data + i) = mem_region->mem[index + i];
+					}
+					respPkt->isReq = false;
+					/*
+					* send the respond to the previous base_object which is waiting
+					* for this respond packet. For now, prev for memory is core but
+					* you should update the prev since you are adding the caches
+					*/
+					prev->recvResp(respPkt);
+				}
+			}
+		}
+		else {
 			/*
 			 * assume that reqQueue is sorted by ready_time for now
 			 * (because the pipeline is in-order)

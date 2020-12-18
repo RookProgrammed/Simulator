@@ -8,6 +8,7 @@
 #define __SIMULATOR_H__
 
 #include "base_memory.h"
+#include "cache.h"
 #include "pipe.h"
 #include "util.h"
 
@@ -16,6 +17,9 @@ public:
 	Simulator(MemHrchyInfo* info);
 	virtual ~Simulator();
 	PipeState * pipe;
+	Cache * L2_cache;
+	Cache * L1I_cache;
+	Cache * L1D_cache;
 	BaseMemory * main_memory;
 
 	/*
