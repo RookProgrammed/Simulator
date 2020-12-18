@@ -81,8 +81,8 @@ bool Cache::sendReq(Packet * pkt){
 	//this is used when we receive a request from the upper level
 	pkt->ready_time += accessDelay;
 	DPRINTF(DEBUG_CACHE,
-			"cache receive pkt: addr = %x, ready_time = %d, type = %d\n",
-			pkt->addr, pkt->ready_time, pkt->type);
+			"cache %d receive pkt: addr = %x, ready_time = %d, type = %d\n",
+			!is_L1+1, pkt->addr, pkt->ready_time, pkt->type);
 	//add the packet to request queue if it has free entry
 	if (reqQueue.size() < reqQueueCapacity) {
 		reqQueue.push(pkt);
@@ -114,22 +114,26 @@ void Cache::recvResp(Packet* readRespPkt){
 	
 	/************this is used for inclusive cache*************/
 	bool L1D_newer = false;
+	/************this is used for inclusive cache*************/
+	bool L1D_newer = false;
 	if (!is_L1){
 		//currently, we are changing L2
 		//make sure that the victim cache is not valide in L1
 		int L1D_way = (prev==nullptr)? -1:((Cache *)prev)->getWay(victim_addr);
 		int L1I_way = (prev2==nullptr)?-1:((Cache *)prev2)->getWay(victim_addr);
+		int upper_Index = (readRespPkt->addr / blkSize) & (((Cache *)prev)->numSets -1);
 		if (L1D_way >= 0){
 			//this means there is a corresponding cache in the L1D
-			((Cache *)prev)->blocks[set_Index][L1D_way]->setValid(false);
-			if (((Cache *)prev)->blocks[set_Index][L1D_way]->getDirty()){
+			Block * upper_block = ((Cache *)prev)->blocks[upper_Index][L1D_way];
+			upper_block->setValid(false);
+			if (upper_block->getDirty()){
 				//means that there is a dirty block (newer block) in L1
 				L1D_newer = true;
 				Block *wb_block = new Block(blkSize);
 				for (uint32_t i=0;i<blkSize;i++){
-					wb_block->getData()[i] = ((Cache *)prev)->blocks[set_Index][L1D_way]->getData()[i];
+					wb_block->getData()[i] = upper_block->getData()[i];
 				}
-				wb_block->clear(((Cache *)prev)->blocks[set_Index][L1D_way]->getTag());
+				wb_block->clear(upper_block->getTag());
 				//write the block into the write-back buffer
 				write_back_buffer.push(wb_block);
 				Packet* wb_packet= new Packet(false, true, PacketTypeStore, victim_addr, blkSize, nullptr, currCycle);
@@ -140,7 +144,7 @@ void Cache::recvResp(Packet* readRespPkt){
 		}
 		if (L1I_way >=0){
 			//no write for the instruction cache known, unless some strage behavior
-			((Cache *)prev2)->blocks[set_Index][L1I_way]->setValid(false);
+			((Cache *)prev2)->blocks[upper_Index][L1I_way]->setValid(false);
 		}
 	}
 	if (victim_block->getDirty() && !L1D_newer){
@@ -197,7 +201,6 @@ void Cache::recvResp(Packet* readRespPkt){
 		}
 	}
 	else{
-
 		prev->recvResp(readRespPkt);
 	}
 	return;
