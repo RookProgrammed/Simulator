@@ -71,8 +71,8 @@ typedef struct Pipe_Op {
 	bool readyForNextStage;
 
 	//Added code, branch prediction start
-	uint32_t pred_dest;
-	bool pred_taken;
+	uint32_t dest_pred;
+	bool taken_pred;
 	//Added code end
 } Pipe_Op;
 
